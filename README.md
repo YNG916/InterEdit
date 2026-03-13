@@ -9,7 +9,35 @@
 ## Introduction
 This repository is an implementation of InterEdit.
 
+## Dual-person motion editing demos
 
+### Example 1
+**Edit instruction:** Both people play rock-paper-scissors instead of shaking hands.
+
+| Source | Edited |
+|---|---|
+| ![](readme/2/source_2.gif) | ![](readme/2/g2.gif) |
+
+### Example 2
+**Edit instruction:** Both individuals face each other and punch each other instead of kicking. 
+
+| Source | Edited |
+|---|---|
+| ![](readme/4/source_4.gif) | ![](readme/4/g4.gif) |
+
+### Example 3
+**Edit instruction:** Both individuals face each other instead of standing side by side.
+
+| Source | Edited |
+|---|---|
+| ![](readme/6/source_6.gif) | ![](readme/6/g6.gif) |
+
+### Example 4
+**Edit instruction:** Both individuals dance shoulder to shoulder instead of standing still.
+
+| Source | Edited |
+|---|---|
+| ![](readme/7/source_7.gif) | ![](readme/7/g7.gif) |
 
 ## Getting started
 
