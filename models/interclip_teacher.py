@@ -19,12 +19,6 @@ def load_yaml_cfg(path: str):
 
 
 def build_interclip_teacher(cfg_or_path, ckpt_path: str | None = None) -> nn.Module:
-    """
-    Build InterCLIP teacher from cfg object OR yaml path.
-
-    IMPORTANT: we import InterCLIP lazily here to avoid circular import:
-      evaluator_models -> models -> nets -> interclip_teacher -> evaluator_models
-    """
     from datasets.evaluator_models import InterCLIP
 
     if isinstance(cfg_or_path, str):
@@ -57,7 +51,6 @@ def build_interclip_teacher(cfg_or_path, ckpt_path: str | None = None) -> nn.Mod
 class InterCLIPTeacherWrapper(nn.Module):
     """
     Teacher wrapper that returns motion embedding (B,512) for target motion.
-    Auto-adapts whether to drop foot-contact dims (last 4 dims per person) externally.
     """
     def __init__(self, teacher: nn.Module):
         super().__init__()

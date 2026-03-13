@@ -225,19 +225,16 @@ class InterEditDenoiser(nn.Module):
         # which layer to tap plan for loss
         self.plan_layer_idx = int(kargs['cfg'].get('PLAN_LAYER_IDX', self.num_layers // 2))
 
-        # buffers to be read by diffusion loss
         self._plan_pred_tokens = None  # (B,K,512)
 
         # --- freq tokens (S/D, 3 bands each => 6 tokens) ---
         self.use_freq = bool(kargs['cfg'].get('USE_FREQ', True))
         self.freq_drop_prob = float(kargs['cfg'].get('FREQ_DROP_PROB', 0.0))
 
-        # how many dims used for freq (exclude last 4 foot-contact dims per person)
         self.freq_feat_dim = int(kargs['cfg'].get('FREQ_FEAT_DIM', self.input_feats - 4))
 
-        self.num_freq = 6  # fixed: S_low,S_mid,S_high,D_low,D_mid,D_high
+        self.num_freq = 6  # S_low,S_mid,S_high,D_low,D_mid,D_high
 
-        # project (B,Dfeat) -> (B,2C) token
         self.freq_token_proj = nn.ModuleList([
             nn.Sequential(
                 nn.LayerNorm(self.freq_feat_dim),
@@ -245,7 +242,6 @@ class InterEditDenoiser(nn.Module):
             ) for _ in range(self.num_freq)
         ])
 
-        # heads for regression loss: token (2C) -> (Dfeat)
         self.freq_head = nn.ModuleList([
             nn.Sequential(
                 nn.LayerNorm(self.latent_dim * 2),
@@ -253,15 +249,14 @@ class InterEditDenoiser(nn.Module):
             ) for _ in range(self.num_freq)
         ])
 
-        self._freq_pred = None  # (B,6,Dfeat) filled at freq_layer_idx
+        self._freq_pred = None
         self.freq_layer_idx = int(kargs['cfg'].get('FREQ_LAYER_IDX', self.num_layers // 2))
 
-        # Output Module
         self.out = zero_module(FinalLayer(self.latent_dim, self.input_feats))
 
     def forward(self, x, timesteps, mask=None, cond=None, source_emb=None):
         """
-        x: (B,T,2*D) where D=input_feats
+        x: (B,T,2*D)
         cond: (B,768)
         source_emb: (B,512)
         """
@@ -284,28 +279,21 @@ class InterEditDenoiser(nn.Module):
             mask = torch.ones(B, T, device=x_a.device)
         key_padding_mask = ~(mask > 0.5)
         
-        # --- init plan tokens ---
         plan = None
         if self.use_plan and (self.plan_tokens is not None):
             plan = self.plan_tokens.expand(B, -1, -1)  # (B,Kp,2C)
 
-        # --- init freq tokens ---
         freq = None
         self._freq_pred = None
 
         if self.use_freq:
-            # optional dropout (like token dropout), applied per-batch
             drop = (self.training and (self.freq_drop_prob > 0.0) and (torch.rand(1, device=x.device) < self.freq_drop_prob))
             if not drop:
-                # compute S/D on denoiser input x (noisy), but we will supervise using GT in diffusion loss.
-                # Here we only need tokens as conditioning signals.
-                # Use features excluding last 4 dims per person.
-                xa = x_a[..., :self.freq_feat_dim]  # (B,T,Dfeat)
+                xa = x_a[..., :self.freq_feat_dim]
                 xb = x_b[..., :self.freq_feat_dim]
                 S = 0.5 * (xa + xb)
                 D = (xa - xb)
 
-                # mask padded frames to reduce pad artifacts
                 if mask is None:
                     m = torch.ones((B, T), device=x.device, dtype=xa.dtype)
                 else:
@@ -332,7 +320,7 @@ class InterEditDenoiser(nn.Module):
                 feats = [Fs_low, Fs_mid, Fs_high, Fd_low, Fd_mid, Fd_high]
                 freq = torch.stack([self.freq_token_proj[i](feats[i]) for i in range(6)], dim=1)  # (B,6,2C)
 
-        self._plan_pred_tokens = None  # clear each forward
+        self._plan_pred_tokens = None
         self._freq_pred = None
 
         for li, block in enumerate(self.blocks):
@@ -340,8 +328,6 @@ class InterEditDenoiser(nn.Module):
             h_a_prev, h_b_prev = h_a, h_b
 
             # tap plan tokens for plan loss
-            # if li == self.plan_layer_idx:
-            #     self._plan_pred_tokens = self.plan_proj_token(plan)
             if self.use_plan and (plan is not None) and (li == self.plan_layer_idx):
                 self._plan_pred_tokens = self.plan_proj_token(plan)
 
@@ -354,12 +340,10 @@ class InterEditDenoiser(nn.Module):
                 self._freq_pred = torch.stack(preds, dim=1)
 
 
-        # output head unchanged
         output_a = self.out(h_a)
         output_b = self.out(h_b)
         output = torch.cat([output_a, output_b], dim=-1)
 
-        # fallback: if plan_layer_idx out of range, use final plan
         if self.use_plan and (plan is not None) and (self._plan_pred_tokens is None):
             self._plan_pred_tokens = self.plan_proj_token(plan)
 
@@ -406,7 +390,7 @@ class InterEditDiffusion(nn.Module):
         # source encoder
         self.motion_encoder = SourceMotionEncoder(cfg)
 
-        # --- InterCLIP teacher for plan loss ---
+        # --- Motion teacher for plan loss ---
         self.plan_loss_w = float(getattr(cfg, "PLAN_LOSS_W", 0.05))
         self.use_plan = bool(getattr(cfg, "USE_PLAN", True))
         self.plan_loss_type = str(getattr(cfg, "PLAN_LOSS_TYPE", "infonce")).lower()
@@ -465,19 +449,11 @@ class InterEditDiffusion(nn.Module):
         return src_mask
 
     def compute_loss(self, batch):
-        """
-        batch["motions"]  : targets (B,T,2*D)
-        batch["sources"] : sources (B,T,2*D)
-        batch["motion_lens"] : target lens (B,)
-        batch["source_lens"] : source lens (B,)
-        batch["cond"] : text cond (B,768)
-        """
         cond = batch["cond"]
         x_start = batch["motions"]       # target
         sources = batch["sources"]       # source
         B, T = x_start.shape[:2]
 
-        # text cfg dropout (and use same keep mask for source_emb to avoid "source leak")
         cond, keep_mask = self.mask_cond(cond, 0.1)  # keep_mask: (B,1) or None
 
         # source mask -> source embedding
@@ -509,7 +485,7 @@ class InterEditDiffusion(nn.Module):
 
 
         # --- plan loss: token-wise InfoNCE with GLOBAL in-batch negatives (DDP all_gather) ---
-        # --- plan loss: selectable types (infonce/cos/mse/combos), token-level then reduce over K ---
+        # --- types (infonce/cos/mse/combos), token-level then reduce over K ---
         if self.use_plan and (self.plan_loss_w > 0):
             tau = float(getattr(self.cfg, "PLAN_TAU", 0.1))
 
@@ -518,7 +494,6 @@ class InterEditDiffusion(nn.Module):
                 E_tgt = self.teacher.motion_emb(x_start, batch["motion_lens"])  # (B,512)
                 E_tgt_n = F.normalize(E_tgt, dim=-1)                            # (B,512)
 
-            # ensure predicted plan tokens exist
             pred_tokens = self.net._plan_pred_tokens  # (B,K,512) or None
             if pred_tokens is None:
                 if (self.net.plan_tokens is None) or (self.net.plan_proj_token is None):
@@ -529,18 +504,15 @@ class InterEditDiffusion(nn.Module):
                     pred_tokens = self.net.plan_proj_token(self.net.plan_tokens.expand(B, -1, -1))  # (B,K,512)
 
             if pred_tokens is not None:
-                # keep mask (CFG drop): only compute plan loss on kept samples
                 keep = (keep_mask.view(-1) > 0.5) if (keep_mask is not None) else None
 
                 def _apply_keep(loss_b: torch.Tensor) -> torch.Tensor:
-                    # loss_b: (B,)
                     if keep is None:
                         return loss_b.mean()
                     if keep.any():
                         return loss_b[keep].mean()
                     return loss_b.sum() * 0.0
 
-                # (A) token-wise cosine distance then reduce K
                 def compute_cos() -> torch.Tensor:
                     pred_n = F.normalize(pred_tokens, dim=-1)     # (B,K,512)
                     tgt_n  = E_tgt_n[:, None, :]                  # (B,1,512)
@@ -549,14 +521,12 @@ class InterEditDiffusion(nn.Module):
                     loss_b  = _reduce_over_k(loss_bk, self.plan_reduce_k)  # (B,)
                     return _apply_keep(loss_b)
 
-                # (B) token-wise MSE then reduce K
                 def compute_mse() -> torch.Tensor:
                     diff = pred_tokens - E_tgt[:, None, :]        # (B,K,512)
                     loss_bk = (diff * diff).mean(dim=-1)          # (B,K)
                     loss_b  = _reduce_over_k(loss_bk, self.plan_reduce_k)  # (B,)
                     return _apply_keep(loss_b)
 
-                # (C) token-wise InfoNCE (needs global in-batch negatives)
                 def compute_infonce() -> torch.Tensor:
                     E_all = _all_gather_cat(E_tgt_n)              # (B_global,512)
                     pred_n = F.normalize(pred_tokens, dim=-1)     # (B,K,512)
@@ -580,7 +550,7 @@ class InterEditDiffusion(nn.Module):
                         return logits_flat.sum() * 0.0
                     return F.cross_entropy(logits_flat, labels_flat)
 
-                # ---- choose / combine ----
+                # ---- choose ----
                 lt = str(self.plan_loss_type).lower()
                 if lt == "infonce":
                     plan_loss = compute_infonce()
@@ -612,7 +582,6 @@ class InterEditDiffusion(nn.Module):
             S = 0.5 * (xa + xb)
             Drel = (xa - xb)
 
-            # mask pads using target mask (tgt_mask[...,0] is 1/0)
             if tgt_mask is not None:
                 m = tgt_mask[..., 0].to(dtype=S.dtype)  # (B,T)
                 S = S * m[:, :, None]
@@ -637,7 +606,6 @@ class InterEditDiffusion(nn.Module):
             w = torch.tensor([1.0, 1.0, self.freq_high_w, 1.0, 1.0, self.freq_high_w],
                              device=pred.device, dtype=pred.dtype).view(1, 6, 1)
 
-            # optional: only compute on kept text (avoid leakage in CFG-drop)
             if keep_mask is not None:
                 keep = (keep_mask.view(-1) > 0.5)  # (B,)
                 if keep.any():

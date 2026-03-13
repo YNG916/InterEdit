@@ -76,13 +76,11 @@ class InterEditTransformerBlock(nn.Module):
         inputs[:, ::2, c:] = y
         inputs[:, 1::2, c:] = x
 
-        # padding mask for 2T tokens: True=pad
         mask = torch.ones((b, t * 2), dtype=torch.bool, device=x.device)
         index = torch.arange(t * 2, device=x.device).unsqueeze(0).repeat(b, 1)
         valid_idx = (~key_padding_mask).sum(-1) * 2
         mask[index < valid_idx.unsqueeze(1)] = False
 
-        # ---- build ctrl tokens (plan/freq may be None) ----
         if (plan is not None) and (freq is not None):
             ctrl = torch.cat([plan, freq], dim=1)  # (B,Kp+Kf,2C)
         elif plan is not None:
@@ -110,7 +108,7 @@ class InterEditTransformerBlock(nn.Module):
         h_frames = h1[:, :t * 2, :]               # (B,2T,2C)
         h_ctrl = None if ctrl is None else h1[:, t * 2:, :]  # (B,K,2C) or None
 
-        # split plan/freq inside ctrl (if exists)
+        # split plan/freq inside ctrl
         if h_ctrl is not None:
             if (Kp > 0) and (Kf > 0):
                 h_plan = h_ctrl[:, :Kp, :]

@@ -102,9 +102,7 @@ class EvaluatorModelWrapper(object):
 
 class EvaluationDataset(Dataset):
     """
-    Cache generated motions to support legacy evaluation codepaths:
-      - If dataset yields 5-tuple: name, text, m1, m2, len -> generate from text only
-      - If dataset yields 8-tuple: name, text, src1, src2, tgt1, tgt2, src_len, tgt_len -> generate from (text, sources)
+    Cache generated motions:
     """
     def __init__(self, model, dataset, device, mm_num_samples, mm_num_repeats):
         self.normalizer = MotionNormalizer()
@@ -144,7 +142,6 @@ class EvaluationDataset(Dataset):
                     src_len_i = int(src_len[0].item())
                     tgt_len_i = int(tgt_len[0].item())
 
-                    # IMPORTANT FIX: slice to T=tgt_len_i so sources time length == motion_lens time length
                     T = max(1, tgt_len_i)
                     src1_T = src1[:, :T, :]
                     src2_T = src2[:, :T, :]
@@ -175,17 +172,14 @@ class EvaluationDataset(Dataset):
                 else:
                     motions_output = motions_output[:, :self.max_length]
 
-                # choose a length to store; prefer out["motion_lens"] if present
                 if "motion_lens" in out and isinstance(out["motion_lens"], torch.Tensor):
                     store_len = int(out["motion_lens"][0].item())
                 else:
-                    # fallback: if we were editing case, use tgt_len; else max_length
                     if len(data) == 8:
                         store_len = int(tgt_len[0].item())
                     else:
                         store_len = self.max_length
 
-                # normal dataset item (first sample)
                 self.generated_motions.append({
                     "motion1": motions_output[0, :, 0],
                     "motion2": motions_output[0, :, 1],
@@ -239,13 +233,8 @@ def get_motion_loader(batch_size, model, ground_truth_dataset, device, mm_num_sa
 class EditEvaluationDataset(Dataset):
     """
     Cache aligned triples for editing:
-      dataset must return:
+      dataset return:
         name, text, src1, src2, tgt1, tgt2, src_len, tgt_len
-    We call model.forward_test with:
-      - sources sliced to T=tgt_len_i
-      - motions  sliced to T=tgt_len_i (optional, but keeps consistency)
-      - motion_lens = T
-      - source_lens = min(src_len_i, T)
     """
     def __init__(self, model, dataset, device):
         self.normalizer = MotionNormalizer()
@@ -270,7 +259,6 @@ class EditEvaluationDataset(Dataset):
                 tgt_len_i = int(tgt_len[0].item())
                 T = max(1, tgt_len_i)
 
-                # IMPORTANT FIX: slice to T so mask sizes match sources/motions time length
                 src1_T = src1[:, :T, :]
                 src2_T = src2[:, :T, :]
                 tgt1_T = tgt1[:, :T, :]
@@ -302,7 +290,6 @@ class EditEvaluationDataset(Dataset):
                 else:
                     gen_np = gen_np[:, :self.max_length]
 
-                # NOTE: src/tgt are already padded to max_length by dataset; store as numpy (B=1)
                 self.generated_motions.append({
                     "name": str(name[0]),
                     "text": str(text[0]),
@@ -347,7 +334,6 @@ class _SrcDataset(Dataset):
 def get_edit_motion_loader(batch_size, model, ground_truth_dataset, device):
     """
     Returns three aligned loaders: gen_loader, tgt_loader, src_loader
-    (no shuffle, no drop_last).
     """
     base = EditEvaluationDataset(model, ground_truth_dataset, device)
 
