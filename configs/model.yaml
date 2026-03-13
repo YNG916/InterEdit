@@ -1,0 +1,49 @@
+NAME: InterEdit
+NUM_LAYERS: 5
+NUM_HEADS: 16
+DROPOUT: 0.1
+INPUT_DIM: 262
+LATENT_DIM: 512
+FF_SIZE: 2048
+ACTIVATION: gelu
+CHECKPOINT: checkpoints/02-08-2026-lp=2-lf=4-drop=0.04/model/epoch=1499-step=43500.ckpt
+
+DIFFUSION_STEPS: 1000
+BETA_SCHEDULER: cosine
+SAMPLER: uniform
+
+MOTION_REP: global
+FINETUNE: False
+
+TEXT_ENCODER: clip
+T_BAR: 700
+
+CONTROL: text
+STRATEGY: ddim50
+CFG_WEIGHT: 3.5
+CFG_SCALE_TEXT: 3.5
+CFG_SCALE_MOTION: 3.5
+# ---- plan token  ----
+USE_PLAN: True
+NUM_PLAN: 16
+PLAN_LOSS_W: 0.03          # InfoNCE: 0.03; mse/cos: 0.1; ablation: 0.03/0.3/3
+TEACHER_CFG: configs/eval_model.yaml
+TEACHER_CKPT: eval_model/interclip.ckpt
+PLAN_LOSS_TYPE: infonce    # infonce | cos | mse | cos_mse | infonce_cos | infonce_mse
+PLAN_TAU: 0.07             # 0.1,  only for infonce
+PLAN_COS_W: 1.0            # only for combined types
+PLAN_MSE_W: 1.0            # only for combined types
+PLAN_REDUCE_K: mean        # mean | min | max
+PLAN_LAYER_IDX: 2          # 0-4
+
+# ---- freq tokens ----
+USE_FREQ: True
+FREQ_LOSS_W: 0.01        
+FREQ_HIGH_W: 0.25       
+FREQ_LAYER_IDX: 4        
+FREQ_FEAT_DIM: 258       # INPUT_DIM-4, INPUT_DIM=262
+FREQ_R_LOW: 0.08
+FREQ_R_MID: 0.25
+FREQ_R_HI: 0.35
+FREQ_DROP_PROB: 0.04     
+
