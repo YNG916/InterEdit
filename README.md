@@ -25,7 +25,7 @@ conda install -c conda-forge chumpy=0.70, numpy=2.2.6, scipy=1.15.2
 ### 2. Data Preparation
 
 
-Download the data from [webpage](https://drive.google.com/drive/folders/1DccBLYvhMCBGXvDJcR9yBdBdeDArEdX1?usp=drive_link). And put them into ./data/interedit_processed.
+Download InterEdit3D dataset from [webpage](https://drive.google.com/drive/folders/1DccBLYvhMCBGXvDJcR9yBdBdeDArEdX1?usp=drive_link). And put them into ./data/interedit_processed.
 
 #### Data Structure
 ```sh
@@ -48,11 +48,11 @@ Prepare the evaluation model
 bash prepare/download_evaluation_model.sh
 ```
 
-Download the checkpoints of [InterEdit](https://drive.google.com/file/d/1hhjtksw8ZLHXV6ilG1ro0LRGKNKnPI3R/view?usp=drive_link)
+Download the pre-trained checkpoint of [InterEdit](https://drive.google.com/file/d/1hhjtksw8ZLHXV6ilG1ro0LRGKNKnPI3R/view?usp=drive_link)
 
 
 
-## Train (8 GPUs)
+## Train
 
 
 Modify config files ./configs/model.yaml
