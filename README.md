@@ -16,28 +16,28 @@ This repository is an implementation of InterEdit.
 
 | Source | Edited |
 |---|---|
-| ![](readme/2/source_2.gif) | ![](readme/2/g2.gif) |
+| ![](readme/2/source_2_padded.gif) | ![](readme/2/g2_padded.gif) |
 
 ### Example 2
 **Edit instruction:** Both individuals face each other and punch each other instead of kicking. 
 
 | Source | Edited |
 |---|---|
-| ![](readme/4/source_4.gif) | ![](readme/4/g4.gif) |
+| ![](readme/4/source_4_padded.gif) | ![](readme/4/g4_padded.gif) |
 
 ### Example 3
 **Edit instruction:** Both individuals face each other instead of standing side by side.
 
 | Source | Edited |
 |---|---|
-| ![](readme/6/source_6.gif) | ![](readme/6/g6.gif) |
+| ![](readme/6/source_6_padded.gif) | ![](readme/6/g6_padded.gif) |
 
 ### Example 4
 **Edit instruction:** Both individuals dance shoulder to shoulder instead of standing still.
 
 | Source | Edited |
 |---|---|
-| ![](readme/7/source_7.gif) | ![](readme/7/g7.gif) |
+| ![](readme/7/source_7_padded.gif) | ![](readme/7/g7_padded.gif) |
 
 ## Getting started
 
