@@ -4,13 +4,18 @@ from functools import partial
 from typing import Optional, Union
 
 import numpy as np
-from mmcv.runner import get_dist_info
-from mmcv.utils import Registry, build_from_cfg
+import torch
+import torch.distributed as dist
 from torch.utils.data import DataLoader
+from torch.utils.data import DistributedSampler as _DistributedSampler
 from torch.utils.data.dataset import Dataset
 
-import torch
-from torch.utils.data import DistributedSampler as _DistributedSampler
+
+def get_dist_info():
+    """Compatibility helper matching the old mmcv.runner.get_dist_info API."""
+    if dist.is_available() and dist.is_initialized():
+        return dist.get_rank(), dist.get_world_size()
+    return 0, 1
 
 
 class DistributedSampler(_DistributedSampler):

@@ -246,8 +246,6 @@ dependencies:
       - markdown-it-py==4.0.0
       - markupsafe==2.1.5
       - mdurl==0.1.2
-      - mmcv==1.6.2
-      - mmengine==0.10.7
       - mpmath==1.3.0
       - multidict==6.7.1
       - nvidia-cublas-cu12==12.8.4.1

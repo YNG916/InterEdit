@@ -47,8 +47,9 @@ This repository is an implementation of InterEdit.
 conda create -n InterEdit python=3.10
 conda activate InterEdit
 pip install -r requirements.txt
-conda install -c conda-forge chumpy=0.70, numpy=2.2.6, scipy=1.15.2
+conda install -c conda-forge chumpy=0.70 numpy=2.2.6 scipy=1.15.2
 ```
+
 
 ### 2. Data Preparation
 
@@ -98,6 +99,5 @@ python tools/eval.py \
   --exp-name interedit_eval \
   --LPA
 ```
-
 
 
